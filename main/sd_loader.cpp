@@ -2,10 +2,10 @@
 #include <MD5Builder.h>
 #include <Update.h>
 #include "esp_ota_ops.h"
-#include "../SerialLogger.h"
-#include "../SPI_routines.h"
-#include "../SD_routines.h"
-#include "../hardware.h"
+#include "SerialLogger.h"
+#include "SPI_routines.h"
+#include "SD_routines.h"
+#include "hardware.h"
 
 uint8_t _buffer[1024];
 char _expectedMd5[33];
