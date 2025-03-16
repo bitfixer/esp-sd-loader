@@ -1,8 +1,8 @@
 #include <stdint.h>
 #include <MD5Builder.h>
 #include <Update.h>
-#include "esp_ota_ops.h"
 #include "SerialLogger.h"
+#include "esp_ota_ops.h"
 #include "SPI_routines.h"
 #include "SD_routines.h"
 #include "hardware.h"
@@ -11,11 +11,10 @@ uint8_t _buffer[1024];
 char _expectedMd5[33];
 char _firmwareFilename[13];
 
-bitfixer::Serial1 _logSerial;
-bitfixer::SerialLogger _logger;
 bSPI _spi;
 SD _sd;
 bitfixer::FAT32 _fat32;
+bitfixer::SerialLogger _logger;
 
 void blink_led(int count, int ms_on, int ms_off)
 {
@@ -251,8 +250,7 @@ void setup()
     init_led();
     set_led(false);
 
-    _logSerial.init(115200);
-    _logger.initWithSerial(&_logSerial);
+    _logger.initWithSerial();
     _logger.printf("checking for firmware\n");
 
     _spi.init();
@@ -260,6 +258,8 @@ void setup()
     _fat32.initWithParams(&_sd, _buffer, &_buffer[512], &_logger);
 
     bool hasFirmware = checkForFirmware((char*)&_buffer[769], &_fat32, &_logger);
+    // test
+    return;
 
     if (hasFirmware)
     {

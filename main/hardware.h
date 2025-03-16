@@ -10,7 +10,6 @@
 #include <stdint.h>
 #include <stddef.h>
 #include "FAT32.h"
-#include "Logger.h"
 
 #define PACKED __attribute__ ((packed))
 
