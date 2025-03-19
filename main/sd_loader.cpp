@@ -242,6 +242,8 @@ bool checkForFirmware(char* buffer, bitfixer::FAT32* fat32, bitfixer::SerialLogg
 
 void setup()
 {
+    Serial.begin(115200, SERIAL_8N1, 2, 3);
+    
     // clear expected md5
     memset(_expectedMd5, 0, 33);
     memset(_firmwareFilename, 0, 13);
