@@ -1,0 +1,5 @@
+sdkconfig
+.vscode/
+build/
+dependencies.lock
+managed_components/
