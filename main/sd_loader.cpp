@@ -98,7 +98,7 @@ int sd_card_update(bitfixer::FAT32* fs, Logger* logger)
         }
 
         int lastFlashingPct = -1;
-        logger->printf("flashing: ");
+        logger->printf("flashing: \n");
         while (!Update.isFinished()) {
             //read sdcard
             uint16_t numBytes = fs->getNextFileBlock();
@@ -114,7 +114,7 @@ int sd_card_update(bitfixer::FAT32* fs, Logger* logger)
                 {
                     // blink once every 10% progress
                     blink_led(1, 150, 150);
-                    logger->printf("%d ", pct);
+                    logger->printf("%d \n", pct);
                 }
                 lastFlashingPct = pct;
             } else {
@@ -260,8 +260,6 @@ void setup()
     _fat32.initWithParams(&_sd, _buffer, &_buffer[512], &_logger);
 
     bool hasFirmware = checkForFirmware((char*)&_buffer[769], &_fat32, &_logger);
-    // test
-    return;
 
     if (hasFirmware)
     {

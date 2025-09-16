@@ -3,7 +3,12 @@
 #include <EEPROM.h>
 #include <SPI.h>
 
+#if CONFIG_IDF_TARGET_ESP32
 #define LED_PIN     2
+#else
+#define LED_PIN     15
+#endif
+
 #define CS_PIN      4
 
 uint8_t spi_cs()
@@ -167,7 +172,11 @@ bool isFirmwareFile(char* fname)
         fname[3] == 'M' &&
         fname[9] == 'P' &&
         fname[10] == 'D' &&
+#ifdef CONFIG_IDF_TARGET_ESP32
         fname[11] == '2')
+#else
+        fname[11] == '3')
+#endif
     {
         return true;
     }
