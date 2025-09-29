@@ -24,7 +24,6 @@
 #include "SD_routines.h"
 #include <string.h>
 #include <ctype.h>
-#include "Serial.h"
 #include <stdio.h>
 
 //Attribute definitions for file/directory
