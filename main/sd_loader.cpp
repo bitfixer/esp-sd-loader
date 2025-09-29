@@ -10,6 +10,7 @@
 #include "esp_flash_partitions.h"
 #include "string.h"
 #include "FAT32.h"
+#include "sd_updater.h"
 
 
 uint8_t _buffer[1024];
@@ -185,6 +186,11 @@ bool checkForFirmware(char* buffer, bitfixer::FAT32* fat32)
     return true;
 }
 
+#define CS_PIN      4
+#define MISO_PIN    37
+#define MOSI_PIN    35
+#define SCK_PIN     36
+
 extern "C" void app_main()
 {
     memset(_firmwareFilename, 0, 13);
@@ -195,6 +201,7 @@ extern "C" void app_main()
 
     ESP_LOGI(TAG, "checking for firmware");
 
+    /*
     _spi.init();
     _sd.initWithSPI(&_spi, spi_cs());
     _fat32.initWithParams(&_sd, _buffer, &_buffer[512]);
@@ -213,4 +220,8 @@ extern "C" void app_main()
         blink_led(3, 150, 150);
         no_firmware_action();
     }
+    */
+
+    int res = mount_sdcard_spi(MISO_PIN, MOSI_PIN, SCK_PIN, CS_PIN);
+    ESP_LOGI(TAG, "mount result: %d", res);
 }
