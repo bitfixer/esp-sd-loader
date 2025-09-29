@@ -24,7 +24,6 @@
 #define _FAT32_H_
 
 #include "SD_routines.h"
-#include "SerialLogger.h"
 #include "DataSource.h"
 #include "helpers.h"
 #include <stdint.h>
@@ -91,7 +90,6 @@ public:
     : _sd(NULL)
     , _FatBuffer(NULL)
     , _longEntryString(NULL)
-    , _logger(NULL)
     , _currentDirectoryEntry(0)
     , _initialized(false)
     , _rootCluster(0)
@@ -101,11 +99,10 @@ public:
 
     }
 
-    FAT32(SD* sd, uint8_t* fatbuffer, uint8_t* longEntryBuffer, SerialLogger* logger)
+    FAT32(SD* sd, uint8_t* fatbuffer, uint8_t* longEntryBuffer)
     : _sd(sd)
     , _FatBuffer(fatbuffer)
     , _longEntryString(longEntryBuffer)
-    , _logger(logger)
     , _currentDirectoryEntry(0)
     , _initialized(false)
     , _rootCluster(0)
@@ -117,7 +114,7 @@ public:
 
     ~FAT32() {}
 
-    bool initWithParams(SD* sd, uint8_t* fatbuffer, uint8_t* longEntryBuffer, SerialLogger* logger);
+    bool initWithParams(SD* sd, uint8_t* fatbuffer, uint8_t* longEntryBuffer);
     bool init();
     bool isInitialized();
     uint8_t* getLongEntryString();
@@ -162,7 +159,6 @@ private:
     SD* _sd;
     uint8_t* _FatBuffer;
     uint8_t* _longEntryString;
-    SerialLogger* _logger;
     file_position _filePosition;
     struct dir_Structure* _currentDirectoryEntry;
     bool _initialized;

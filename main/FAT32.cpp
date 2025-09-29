@@ -122,12 +122,11 @@ uint32_t trailSignature; //0xaa550000
 
 namespace bitfixer {
 
-bool FAT32::initWithParams(SD* sd, uint8_t* fatbuffer, uint8_t* longEntryBuffer, SerialLogger* logger)
+bool FAT32::initWithParams(SD* sd, uint8_t* fatbuffer, uint8_t* longEntryBuffer)
 {
     _sd = sd;
     _FatBuffer = fatbuffer;
     _longEntryString = longEntryBuffer;
-    _logger = logger;
     return init();
 }
 
@@ -1179,8 +1178,6 @@ void FAT32::setDateTime(int year, int month, int day, int hour, int minute, int 
     _timeValue = (uint16_t)hour << 11; // top 5 bits
     _timeValue += (uint16_t)minute << 5;
     _timeValue += (uint16_t)(second / 2);
-
-    _logger->printf("d %X t %X\n", _dateValue, _timeValue);
 }
 
 }

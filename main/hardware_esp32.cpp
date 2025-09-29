@@ -1,151 +1,114 @@
 #include "hardware.h"
-#include <EEPROM.h>
-#include <SPI.h>
+#include <freertos/FreeRTOS.h>
+#include <freertos/task.h>
+#include <driver/gpio.h>
+#include <driver/spi_common.h>
+#include <driver/spi_master.h>
+#include <string.h>
+#include <esp_log.h>
 
 #define LED_PIN     2
+
+// esp32
+// TODO: add pins
+
+// esp32s2
 #define CS_PIN      4
+#define MISO_PIN    37
+#define MOSI_PIN    35
+#define SCK_PIN     36
+
+static constexpr const char* TAG = "HW";
 
 uint8_t spi_cs()
 {
     return CS_PIN;
 }
 
-void prog_init()
-{
-    // nothing for esp32
-    set_atn_input();
-    EEPROM.begin(512);    
-}
- 
-void reset_esp()
-{
-    // nothing for esp32
-}
-
 void init_led()
 {
     // nothing for esp32
-    pinMode(LED_PIN, OUTPUT);
+    gpio_set_direction((gpio_num_t)LED_PIN, GPIO_MODE_OUTPUT);
 }
 
 void set_led(bool value)
 {
     if (value == true)
     {
-        digitalWrite(LED_PIN, HIGH);
+        gpio_set_level((gpio_num_t)LED_PIN, 1);
     }
     else
     {
-        digitalWrite(LED_PIN, LOW);
+        gpio_set_level((gpio_num_t)LED_PIN, 0);
     }
 }
 
 void hDelayMs(int ms)
 {
-    delay(ms);
-}
-
-uint8_t bf_pgm_read_byte(uint8_t* src)
-{
-    return pgm_read_byte(src);
-}
-
-void bf_eeprom_write_block(const void* block, void* eeprom, size_t n)
-{
-    EEPROM.writeBytes((int)eeprom, block, n);
-    EEPROM.commit();
-}
-
-void bf_eeprom_read_block(void* block, const void* eeprom, size_t n)
-{
-    EEPROM.readBytes((int)eeprom, (void*)block, n);
-}
-
-uint8_t bf_eeprom_read_byte(const uint8_t* addr)
-{
-    return EEPROM.readByte((int)addr);
+    vTaskDelay(pdMS_TO_TICKS(ms));
 }
 
 // SPI
 
-void spi_init()
-{
-    pinMode(CS_PIN, OUTPUT);
+static spi_device_handle_t _spi;
+static bool _spi_init = false;
+
+void spi_init() {
+    ESP_LOGW(TAG, "spi_init");
+    if (_spi_init) {
+        return;
+    }
+    gpio_set_direction((gpio_num_t)CS_PIN, GPIO_MODE_OUTPUT);
     spi_cs_unselect();
-    SPI.begin();
+
+    esp_err_t ret;
+    spi_bus_config_t buscfg = {
+        .mosi_io_num = MOSI_PIN,
+        .miso_io_num = MISO_PIN,
+        .sclk_io_num = SCK_PIN,
+        .quadwp_io_num = -1,
+        .quadhd_io_num = -1,
+        .max_transfer_sz = 0,  // default
+    };
+
+    ret = spi_bus_initialize(SPI2_HOST, &buscfg, SPI_DMA_DISABLED);
+    _spi_init = true;
+    ESP_ERROR_CHECK(ret);
+
+    spi_device_interface_config_t devcfg = {};
+    devcfg.clock_speed_hz = 25 * 1000 * 1000;  // 25 MHz
+    devcfg.mode = 0;
+    devcfg.spics_io_num = -1;  // <--- NO CS pin
+    devcfg.queue_size = 1;
+
+    ret = spi_bus_add_device(SPI2_HOST, &devcfg, &_spi);
+    ESP_ERROR_CHECK(ret);
+    ESP_LOGW(TAG, "SPI initialized without CS");
 }
 
-uint8_t spi_transmit(uint8_t data)
-{
-    return SPI.transfer(data);
+uint8_t spi_transmit(uint8_t data) {
+    uint8_t rx_byte = 0;
+
+    spi_transaction_t trans = {
+        .length = 8,  // bits
+        .tx_buffer = &data,
+        .rx_buffer = &rx_byte,
+    };
+
+    esp_err_t ret = spi_device_transmit(_spi, &trans);
+    ESP_ERROR_CHECK(ret);
+
+    return rx_byte;
 }
 
 void spi_cs_select()
 {
-    digitalWrite(CS_PIN, LOW);
+    gpio_set_level((gpio_num_t)CS_PIN, 0);
 }
 
 void spi_cs_unselect()
 {
-    digitalWrite(CS_PIN, 1);
-}
-
-// serial
-
-void serial0_init(uint32_t baudRate)
-{
-    // N/A
-}
-
-void serial0_transmitByte(unsigned char data)
-{
-   // N/A
-}
-
-unsigned char serial0_receiveByte()
-{
-    return 0;
-}
-
-void serial0_enable_interrupt()
-{
-    // N/A
-}
-
-void serial0_disable_interrupt()
-{
-    // N/A
-}
-
-void serial1_init(uint32_t baudRate)
-{
-    ::Serial.begin(baudRate);
-}
-
-void serial1_transmitByte(unsigned char data)
-{
-    ::Serial.write(data);
-}
-
-unsigned char serial1_receiveByte()
-{
-    int ret = ::Serial.read();
-    while (ret == -1)
-    {
-        ret = ::Serial.read();
-    }
-
-    return (unsigned char)ret;
-}
-
-void serial1_enable_interrupt()
-{
-    // N/A
-}
-
-void serial1_disable_interrupt()
-{
-    // N/A
+    gpio_set_level((gpio_num_t)CS_PIN, 1);
 }
 
 bool isFirmwareFile(char* fname)
