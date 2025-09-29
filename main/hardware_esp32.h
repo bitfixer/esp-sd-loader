@@ -1,7 +1,6 @@
 #ifndef __hardware_esp32_h__
 #define __hardware_esp32_h__
 
-#include <Arduino.h>
 #include <pgmspace.h>
 #define sscanf_P sscanf
 

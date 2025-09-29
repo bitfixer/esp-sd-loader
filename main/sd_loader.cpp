@@ -1,6 +1,5 @@
 #include <stdint.h>
 #include <MD5Builder.h>
-#include <Update.h>
 #include "esp_ota_ops.h"
 #include "SerialLogger.h"
 #include "SPI_routines.h"
@@ -29,117 +28,95 @@ void blink_led(int count, int ms_on, int ms_off)
     }
 }
 
+#include "esp_log.h"
+#include "esp_system.h"
+#include "esp_ota_ops.h"
+#include "esp_flash_partitions.h"
+#include "string.h"
+
+static const char *TAG = "SD_UPDATE";
+
+// assumes these are defined elsewhere
+extern const char *_firmwareFilename;
+
 // SD card updater
-int sd_card_update(bitfixer::FAT32* fs, Logger* logger)
+int sd_card_update(bitfixer::FAT32* fs)
 {
-    int written = 0;
     int ret = 0;
     int bytesWritten = 0;
- 
-    // open firmware file
-    MD5Builder fwMd5;
 
+    // open firmware file
     fs->openFileForReading((uint8_t*)_firmwareFilename);
     uint32_t fileSize = fs->getFileSize();
 
-    logger->printf("file size: %d\n", fileSize);
-    // blink led quickly during update
-    bool led_state = false;
+    ESP_LOGI(TAG, "file size: %d", fileSize);
     set_led(false);
 
-    // read entire file and generate md5
-    uint16_t b = 512;
-    int count = 0;
-    int blocksPerBlink = 10;
-
-    fwMd5.begin();
-    int numBlocks = 0;
-    while (b == 512)
-    {
-        b = fs->getNextFileBlock();
-        if (b > 0)
-        {
-            numBlocks++;
-            if (numBlocks % blocksPerBlink == 0)
-            {
-                led_state = !led_state;
-                set_led(led_state);
-            }
-            fwMd5.add(fs->getBuffer(), b);
-            count += b;
-        }
+    const esp_partition_t *update_partition = esp_ota_get_next_update_partition(NULL);
+    if (!update_partition) {
+        ESP_LOGE(TAG, "No OTA partition available!");
+        return -1;
     }
 
-    // calculate md5
-    fwMd5.calculate();
-    logger->printf("firmware md5: %s count %d\n", fwMd5.toString().c_str(), count);
+    ESP_LOGI(TAG, "Writing to partition subtype %d at offset 0x%x",
+             update_partition->subtype, update_partition->address);
 
-    // check for match with md5 from file
-    if (strlen(_expectedMd5) > 0) {
-        if (strcmp(fwMd5.toString().c_str(), _expectedMd5) != 0)
-        {
-            logger->printf("calculated md5 does not match, cancelling update\n");
-            return -1;
-        }
-        else
-        {
-            logger->printf("md5 matches.\n");
-        }
+    esp_ota_handle_t ota_handle;
+    esp_err_t err = esp_ota_begin(update_partition, fileSize, &ota_handle);
+    if (err != ESP_OK) {
+        ESP_LOGE(TAG, "esp_ota_begin failed (%s)", esp_err_to_name(err));
+        return -1;
     }
 
-    set_led(false);
+    ESP_LOGI(TAG, "Flashing...");
 
-    // reopen file
-    fs->openFileForReading((uint8_t*)_firmwareFilename);
-    if (Update.begin(fileSize, U_FLASH)){
-        if (!Update.setMD5(fwMd5.toString().c_str()))
-        {
-            logger->printf("error setting md5\n");
-            return -1;
+    int lastFlashingPct = -1;
+    while (true) {
+        uint16_t numBytes = fs->getNextFileBlock();
+        if (numBytes <= 0) {
+            break; // end of file
         }
 
-        int lastFlashingPct = -1;
-        logger->printf("flashing: ");
-        while (!Update.isFinished()) {
-            //read sdcard
-            uint16_t numBytes = fs->getNextFileBlock();
-            written = Update.write(fs->getBuffer(), numBytes);
-            if (written > 0) {
-                if(written != numBytes){
-                    logger->printf("Flashing chunk not full ... warning!\n");
-                }
-                bytesWritten += written;
-
-                int pct = (100*bytesWritten)/fileSize;
-                if (pct > 0 && pct > lastFlashingPct && pct % 10 == 0)
-                {
-                    // blink once every 10% progress
-                    blink_led(1, 150, 150);
-                    logger->printf("%d ", pct);
-                }
-                lastFlashingPct = pct;
-            } else {
-                logger->printf("Flashing ... failed!\n");
-                ret = -1;
-                break;
-            }
-        }
-        
-        logger->printf("\ndone writing to flash\n");
-        if(bytesWritten == fileSize && Update.end()){
-            logger->printf("Flashing ... done!\n");
-            ret = 1;              
-        } else {
-            logger->printf("Flashing or md5 ... failed!"); 
+        err = esp_ota_write(ota_handle, fs->getBuffer(), numBytes);
+        if (err != ESP_OK) {
+            ESP_LOGE(TAG, "esp_ota_write failed (%s)!", esp_err_to_name(err));
             ret = -1;
+            break;
         }
-    } else {
-        logger->printf("Flashing init ... failed!");
-        ret = -1;
-    } 
-        
+
+        bytesWritten += numBytes;
+        int pct = (100 * bytesWritten) / fileSize;
+        if (pct > 0 && pct > lastFlashingPct && pct % 10 == 0) {
+            blink_led(1, 150, 150);
+            ESP_LOGI(TAG, "%d%%", pct);
+        }
+        lastFlashingPct = pct;
+    }
+
+    if (ret == 0) {
+        err = esp_ota_end(ota_handle);
+        if (err != ESP_OK) {
+            ESP_LOGE(TAG, "esp_ota_end failed (%s)", esp_err_to_name(err));
+            ret = -1;
+        } else if (bytesWritten != fileSize) {
+            ESP_LOGE(TAG, "Written size (%d) does not match file size (%d)", bytesWritten, fileSize);
+            ret = -1;
+        } else {
+            ESP_LOGI(TAG, "Flashing done! Setting boot partition.");
+            err = esp_ota_set_boot_partition(update_partition);
+            if (err != ESP_OK) {
+                ESP_LOGE(TAG, "esp_ota_set_boot_partition failed (%s)!", esp_err_to_name(err));
+                ret = -1;
+            } else {
+                ESP_LOGI(TAG, "Update successful, reboot required.");
+                ret = 1;
+            }
+        }
+    }
+
     return ret;
 }
+
 
 void firmware_detected_action(bitfixer::FAT32* fs, Logger* logger)
 {
