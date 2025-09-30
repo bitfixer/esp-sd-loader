@@ -18,9 +18,14 @@ static constexpr const char *TAG = "SD_UPDATE";
 
 #if CONFIG_IDF_TARGET_ESP32
     // Code specific to ESP32
+    #define LED_PIN     2
+    #define CS_PIN      4
+    #define MISO_PIN    19
+    #define MOSI_PIN    23
+    #define SCK_PIN     18
     static constexpr const char* FIRMWARE_EXT = "PD2";
 #elif CONFIG_IDF_TARGET_ESP32S2
-    #define LED_PIN     2
+    #define LED_PIN     15
     #define CS_PIN      4
     #define MISO_PIN    37
     #define MOSI_PIN    35
