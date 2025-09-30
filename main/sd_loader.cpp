@@ -7,12 +7,51 @@
 #include <esp_system.h>
 #include <esp_ota_ops.h>
 #include <esp_flash_partitions.h>
+#include <freertos/FreeRTOS.h>
+#include <freertos/task.h>
+#include <driver/gpio.h>
 #include <string.h>
 #include <ctype.h>
 #include "sd_updater.h"
-#include "hardware.h"
 
 static constexpr const char *TAG = "SD_UPDATE";
+
+#if CONFIG_IDF_TARGET_ESP32
+    // Code specific to ESP32
+    static constexpr const char* FIRMWARE_EXT = "PD2";
+#elif CONFIG_IDF_TARGET_ESP32S2
+    #define LED_PIN     2
+    #define CS_PIN      4
+    #define MISO_PIN    37
+    #define MOSI_PIN    35
+    #define SCK_PIN     36
+    static constexpr const char* FIRMWARE_EXT = "PD3";
+#else
+    #error "Unsupported target"
+#endif
+
+static void init_led()
+{
+    // nothing for esp32
+    gpio_set_direction((gpio_num_t)LED_PIN, GPIO_MODE_OUTPUT);
+}
+
+static void set_led(bool value)
+{
+    if (value == true)
+    {
+        gpio_set_level((gpio_num_t)LED_PIN, 1);
+    }
+    else
+    {
+        gpio_set_level((gpio_num_t)LED_PIN, 0);
+    }
+}
+
+static void hDelayMs(int ms)
+{
+    vTaskDelay(pdMS_TO_TICKS(ms));
+}
 
 static void blink_led(int count, int ms_on, int ms_off)
 {
@@ -24,6 +63,40 @@ static void blink_led(int count, int ms_on, int ms_off)
         set_led(false);
         hDelayMs(ms_off);
     }
+}
+
+static bool isFirmwareFile(const char* fname, const char* ext)
+{
+    if (fname == NULL || ext == NULL)
+    {
+        return false;
+    }
+
+    // extension must be exactly 3 chars
+    if (strlen(ext) != 3)
+    {
+        return false;
+    }
+
+    // filename must be exactly 12 chars
+    if (strlen(fname) != 12)
+    {
+        return false;
+    }
+
+    // check prefix "FIRM"
+    if (strncmp(fname, "FIRM", 4) != 0)
+    {
+        return false;
+    }
+
+    // check extension (last 3 chars)
+    if (strncmp(fname + 9, ext, 3) != 0)
+    {
+        return false;
+    }
+
+    return true;
 }
 
 int sd_card_update2(FILE* fwFile)
@@ -178,7 +251,7 @@ FILE* checkForFirmware2(const char* mountPoint)
         upperStringInPlace(firmwareFilename);
         ESP_LOGI(TAG, "Checking %s", firmwareFilename);
 
-        if (isFirmwareFile(firmwareFilename)) {
+        if (isFirmwareFile(firmwareFilename, FIRMWARE_EXT)) {
             ESP_LOGI(TAG, "Found firmware: %s", firmwareFilename);
             closedir(dir);
 
@@ -198,12 +271,6 @@ FILE* checkForFirmware2(const char* mountPoint)
     ESP_LOGI(TAG, "No firmware file found");
     return nullptr;
 }
-
-
-#define CS_PIN      4
-#define MISO_PIN    37
-#define MOSI_PIN    35
-#define SCK_PIN     36
 
 extern "C" void app_main()
 {
