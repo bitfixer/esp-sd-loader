@@ -99,7 +99,7 @@ static bool isFirmwareFile(const char* fname, const char* ext)
     return true;
 }
 
-int sd_card_update2(FILE* fwFile)
+int sd_card_update(FILE* fwFile)
 {
     if (!fwFile) {
         ESP_LOGE(TAG, "Invalid file pointer");
@@ -196,10 +196,10 @@ int sd_card_update2(FILE* fwFile)
     return ret;
 }
 
-void firmware_detected_action2(FILE* fp)
+void firmware_detected_action(FILE* fp)
 {
     // firmware detected, attempt to perform update
-    int ret = sd_card_update2(fp);
+    int ret = sd_card_update(fp);
     if (ret >= 0)
     {
         ESP_LOGI(TAG, "SD update complete.");
@@ -231,7 +231,7 @@ static void upperStringInPlace(char* str)
     }
 }
 
-FILE* checkForFirmware2(const char* mountPoint)
+FILE* checkForFirmware(const char* mountPoint)
 {
     ESP_LOGI(TAG, "Checking for firmware in %s", mountPoint);
 
@@ -289,7 +289,7 @@ extern "C" void app_main()
         return;
     }
 
-    FILE* firmware_fp = checkForFirmware2("/sdcard");
+    FILE* firmware_fp = checkForFirmware("/sdcard");
     if (!firmware_fp) {
         ESP_LOGI(TAG, "no firmware found.");
         no_firmware_action();
@@ -297,6 +297,6 @@ extern "C" void app_main()
     }
 
     blink_led(2, 150, 150);
-    firmware_detected_action2(firmware_fp);
+    firmware_detected_action(firmware_fp);
     return;
 }
